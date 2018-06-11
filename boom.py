@@ -67,6 +67,8 @@ def main():
     # Load the MNIST dataset
     train, test = chainer.datasets.get_mnist()
 
+    print train
+    
     train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
     test_iter = chainer.iterators.SerialIterator(test, args.batchsize,
                                                  repeat=False, shuffle=False)
@@ -117,7 +119,7 @@ def main():
         chainer.serializers.load_npz(args.resume, trainer)
 
     # Run the training
-    trainer.run()
+    #trainer.run()
 
 
 if __name__ == '__main__':
