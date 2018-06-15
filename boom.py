@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 import argparse
 import chainer
@@ -8,6 +9,7 @@ from chainer.training import extensions
 import matplotlib
 import numpy as np
 import os 
+import sys
 matplotlib.use('Agg')
 
 # Network definition
@@ -32,23 +34,38 @@ class MLP(chainer.Chain):
         h5 = F.relu(self.l5(h4))
         return self.l6(h5)
 
-def readfile(filename):
+def findAllFiles(directory):
+    for root, dirs, files in os.walk(directory):
+        yield root
+        for file in files:
+            yield os.path.join(root, file)
+
+def csvFilter(directory):
+    files = []
+    print "using files"
+    for file in findAllFiles('./'+directory):
+        if(file[-4:] == '.csv'):
+            print file
+            files.append(file)
+    return files
+
+def readfile(filenames):
     train_data = []
     train_label = []
 
     input_num = 3
+    for file in filenames:
+        data_raw = open(file)
+        for line in data_raw:
+            line = line.strip()
+            train = np.array([np.float32(x)for x in line.split(",")[0:input_num]])
+            label = np.int32(line.split(",")[input_num])
 
-    data_raw = open(filename)
-    for line in data_raw:
-        line = line.strip()
-        train = np.array([np.float32(x)for x in line.split(",")[0:input_num]])
-        label = np.int32(line.split(",")[input_num])
-        train_data.append(train)
-        train_label.append(label)
-    return train_data,train_label
+            train_data.append(train)
+            train_label.append(label)
+    return np.array(train_data),np.array(train_label)
 
 def rotateDimension(train,label):
-
     originalTrain = np.array(train)
     originalLabel = label
     train = []
@@ -68,25 +85,29 @@ def rotateDimension(train,label):
     label.extend(originalLabel)
     label.extend(originalLabel)
 
-    return train,label
+    return np.array(train),np.array(label)
 
+def shuffleTrainData(trainset, labelset):
+    labelset = np.array(labelset).reshape(1,len(labelset))
+    trainset = np.array(trainset)
+    #print labelset.shape
+    merge =  np.concatenate((trainset, labelset.T), axis=1) # merge
 
-def find_all_files(directory):
-    for root, dirs, files in os.walk(directory):
-        yield root
-        for file in files:
-            yield os.path.join(root, file)
+    np.random.shuffle(merge)
+    #print merge
 
-def csvFilter():
-    files = []
-    for file in find_all_files('./kas/'):
-        if(file[-4:] == '.csv'):
-            files.append(file)
-    return files
+    return merge[:,[0,1,2]].astype(np.float32) , merge[:,3].astype(np.int32)
+
+def dataHistogram(label):
+    label = np.array(label)
+    his = np.histogram(label,bins=int(label.max())+1,range=(-0.5,label.max()+0.5))
+    for i in range(len(his[0])):
+        print ("class {0} data is {1}".format(i,his[0][i]))
 
 def main():
     parser = argparse.ArgumentParser(description='Chainer example: MNIST')
-    parser.add_argument('--batchsize', '-b', type=int, default=100, help='Number of images in each mini-batch')
+    parser.add_argument('--trainfile', '-t', type=str, default='test', help='training data file path')
+    parser.add_argument('--batchsize', '-b', type=int, default=500, help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=20, help='Number of sweeps over the dataset to train')
     parser.add_argument('--frequency', '-f', type=int, default=-1, help='Frequency of taking a snapshot')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
@@ -117,17 +138,20 @@ def main():
     optimizer = chainer.optimizers.Adam()
     optimizer.setup(model)
 
-    trainset = []
-    labelset = []
-
-    for file in csvFilter():
-        t , l= readfile(file)
-        trainset.extend(t)
-        labelset.extend(l)
-
-    train_data, train_label=rotateDimension(trainset,labelset)
-
+    train_data, train_label = readfile(csvFilter(args.trainfile))
+    train_data, train_label = rotateDimension(train_data,train_label)
     threshold = np.int32(len(train_data)/2)
+
+    
+    print train_data.dtype
+    print train_label.dtype
+
+    train_data, train_label = shuffleTrainData(train_data, train_label)
+
+    print train_data.dtype
+    print train_label.dtype
+
+    #sys.exit()
     train = chainer.datasets.TupleDataset(train_data[0:threshold], train_label[0:threshold])
     test  = chainer.datasets.TupleDataset(train_data[threshold:],  train_label[threshold:])
 
@@ -176,6 +200,7 @@ def main():
     trainer.run()
 
 if __name__ == '__main__':
-        main()
-    #print csvFilter()
+   main()
     
+    
+
