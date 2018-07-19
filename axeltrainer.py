@@ -29,6 +29,7 @@ class MLP(chainer.Chain):
             self.l6 = L.Linear(None, n_out)  # n_units -> n_out
 
     def __call__(self, x):
+        print(np.shape(x))
         h1 = F.relu(self.l1(x))
         h2 = F.relu(self.l2(h1))
         h3 = F.relu(self.l3(h2))
